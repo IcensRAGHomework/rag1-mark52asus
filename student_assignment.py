@@ -44,7 +44,7 @@ def generate_hw01(question):
     ])
 
     response = llm.invoke(prompt.invoke({"query": question}))
-    return response.content
+    return response
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
 def getHolidayData(month):
