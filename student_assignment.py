@@ -44,9 +44,6 @@ def generate_hw01(question):
     ])
 
     response = llm.invoke(prompt.invoke({"query": question}))
-    
-    #pprint(json_parser.invoke(response)) #變成字典輸出
-    #return response.content.replace("```json\n", "").replace("\n```", "")
     return response.content
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
