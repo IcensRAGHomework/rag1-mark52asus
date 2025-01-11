@@ -12,7 +12,6 @@ from model_configurations import get_model_configuration
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-#from langchain.prompts import PromptTemplate
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from typing import List, Dict
 from langchain.output_parsers import PydanticOutputParser
@@ -85,16 +84,33 @@ def generate_hw01(question):
     # 初始化模型
     llm = initialize_llm()
 
-    # 定義 Few-Shot Prompt 和主要 Prompt
-    few_shot_prompt = define_few_shot_prompt()
-    main_prompt = define_main_prompt(few_shot_prompt)
+# 使用新版 langchain_core.prompts.PromptTemplate
+    prompt = PromptTemplate(
+        input_variables=["question"],
+        template="""
+        問題：請回答台灣特定月份的紀念日有哪些(請用JSON格式呈現)?
+        輸出格式範例：
+        {{
+            "Result": [
+                {{
+                    "date": "2024-10-10",
+                    "name": "國慶日"
+                }},
+                {{
+                    "date": "2024-10-25",
+                    "name": "台灣光復節"
+                }}
+            ]
+        }}
+        {question}
+        嚴格按照上述範例格式輸出，直接輸出 JSON，不要加上 ```json 標記。
+        """
+    )
 
-    # 格式化使用者查詢
-    user_prompt = main_prompt.invoke({"query": question})
+    # 使用 RunnableSequence (新版語法)
+    chain = prompt | llm
 
-    # 呼叫模型並取得回應
-    response = llm.invoke(user_prompt)
-    #pprint(response.content);
+    response = chain.invoke({"question": question})
     return response.content
 
     
