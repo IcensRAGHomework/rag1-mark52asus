@@ -79,33 +79,35 @@ def define_main_prompt(few_shot_prompt):
         ("human", "{query}")
     ])
 
+def escape_json(json_obj):
+    """自動將 JSON 物件轉換為雙大括號格式"""
+    return json.dumps(json_obj, ensure_ascii=False).replace("{", "{{").replace("}", "}}")
 # 使用 langchain 和 Few-Shot Examples 回答問題
 def generate_hw01(question):
     # 初始化模型
     llm = initialize_llm()
 
-    # ✅ 定義範例數據 (正確處理 JSON 格式，並使用雙重大括號)
     examples = [
         {
             "input": "2024年台灣10月紀念日有哪些?",
-            "output": json.dumps({
+            "output": escape_json({
                 "Result": [
                     {"date": "2024-10-10", "name": "國慶日"},
                     {"date": "2024-10-25", "name": "台灣光復節"}
                 ]
-            }, ensure_ascii=False).replace("{", "{{").replace("}", "}}")  # 轉義大括號
+            })
         },
         {
             "input": "2024年台灣12月紀念日有哪些?",
-            "output": json.dumps({
+            "output": escape_json({
                 "Result": [
                     {"date": "2024-12-25", "name": "聖誕節"}
                 ]
-            }, ensure_ascii=False).replace("{", "{{").replace("}", "}}")  # 轉義大括號
+            })
         }
     ]
 
-    # ✅ 正確的範例模板 (使用 ChatPromptTemplate 並處理 JSON 格式)
+    # ✅ 定義範例模板 (使用 ChatPromptTemplate)
     example_prompt = ChatPromptTemplate.from_messages([
         ("human", "{input}"),
         ("ai", "{output}")
@@ -117,13 +119,13 @@ def generate_hw01(question):
         example_prompt=example_prompt
     )
 
-    # ✅ 正確提取範例訊息 (直接從 examples 手動轉換為 BaseMessage 格式)
+    # ✅ 正確提取範例訊息 (直接從 examples 轉換為 BaseMessage 格式)
     messages = []
     for example in examples:
         messages.append(HumanMessage(content=example["input"]))
         messages.append(AIMessage(content=example["output"]))
 
-    # ✅ 建立最終 PromptTemplate (正確處理 JSON 格式)
+    # ✅ 建立最終 PromptTemplate (使用雙重大括號以防止格式錯誤)
     final_prompt = ChatPromptTemplate.from_messages(
         [("system", "你是一個能夠以 JSON 格式回應的 AI 助手，請參考以下範例並生成符合範例的輸出。")]
         + [(message.type, message.content) for message in messages]
@@ -134,7 +136,10 @@ def generate_hw01(question):
     chain = final_prompt | llm
 
     response = chain.invoke({"question": question})
-    return response.content
+    result = json.loads(response.content.strip())
+    #print(json.dumps(result, indent=4, ensure_ascii=False))
+    return result
+    #return response.content
 
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
@@ -270,7 +275,7 @@ def demo(question):
     
     return response
 if __name__ == '__main__':
-    response = generate_hw01('2025年台灣11月紀念日有哪些?')
+    response = generate_hw01('2024年台灣10月紀念日有哪些?')
     #response = generate_hw02('2024年台灣12月紀念日有哪些?')
     #question2 = "2024年台灣10月紀念日有哪些?"
     #question3 = "根據先前的節日清單，這個節日{\"date\": \"10-31\", \"name\": \"蔣公誕辰紀念日\"}是否有在該月份清單？"
