@@ -70,13 +70,16 @@ def generate_hw01(question):
         if isinstance(response.content, str):
             response.content = response.content.replace('```json', '').replace('```', '').strip()
         result = json.loads(response.content)
-        # 格式化輸出以符合預期格式
-        formatted_result = json.dumps(result, ensure_ascii=False, indent=4)
-        return formatted_result
+
+        # 如果 "Result" 鍵不存在，則視為無效輸出
+        if "Result" not in result or not isinstance(result["Result"], list):
+            return json.dumps({"Result": []}, ensure_ascii=False, indent=4)
+
+        return json.dumps(result, ensure_ascii=False, indent=4)
+
     except json.JSONDecodeError:
-        print("解析錯誤的內容:", response.content)
-        return "無法解析為正確的 JSON 格式"
-    #return response.content
+        # 如果解析失敗，返回預設格式
+        return json.dumps({"Result": []}, ensure_ascii=False, indent=4)
     
 
 
@@ -109,7 +112,7 @@ def demo(question):
     return response
 if __name__ == '__main__':
     #response = generate_hw01('2023台灣紀念日有哪些?')
-    response = generate_hw01('2024年台灣12月紀念日有哪些?')
+    response = generate_hw01('2024年台灣10月紀念日有哪些?')
     #question2 = "2024年台灣10月紀念日有哪些?"
     #question3 = "根據先前的節日清單，這個節日{\"date\": \"10-31\", \"name\": \"蔣公誕辰紀念日\"}是否有在該月份清單？"
     #response = generate_hw03(question2, question3)
