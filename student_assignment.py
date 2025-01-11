@@ -20,12 +20,15 @@ from pydantic import BaseModel, Field
 from langchain.output_parsers import (ResponseSchema, StructuredOutputParser)
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
 
-def generate_hw01(question):
-    llm = AzureChatOpenAI(
+
+# 初始化 Azure OpenAI (替換為你的設定)
+def initialize_llm():
+    return AzureChatOpenAI(
             model=gpt_config['model_name'],
             deployment_name=gpt_config['deployment_name'],
             openai_api_key=gpt_config['api_key'],
@@ -33,18 +36,67 @@ def generate_hw01(question):
             azure_endpoint=gpt_config['api_base'],
             temperature=gpt_config['temperature']
     )
+# 定義 Few-Shot Examples
+def define_few_shot_examples():
+    examples = [
+        {
+            "input": "2024年台灣10月有哪些紀念日？",
+            "output": {
+                "Result": [
+                    {"date": "2024-10-10", "name": "國慶日"},
+                    {"date": "2024-10-09", "name": "重陽節"}
+                ]
+            }
+        },
+        {
+            "input": "2024年台灣2月有哪些紀念日？",
+            "output": {
+                "Result": []
+            }
+        }
+    ]
+    return examples
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant."
-                    "請回答台灣特定月份的紀念日有哪些(請用以下JSON格式呈現)?"
-                    "請將結果存入Result欄位，紀念日日期存放在date, 紀念日名稱存在name"
-                    "不需要json字眼"
-                    ),
+# 定義 Few-Shot Template
+def define_few_shot_prompt():
+    examples = define_few_shot_examples()
+    example_prompt = ChatPromptTemplate.from_messages([
+        ("human", "{input}"),
+        ("ai", "{output}")
+    ])
+    return FewShotChatMessagePromptTemplate(
+        example_prompt=example_prompt,
+        examples=examples
+    )
+
+# 定義主要 Prompt
+def define_main_prompt(few_shot_prompt):
+    return ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant. "
+                   "請回答台灣特定月份的紀念日有哪些? "
+                   "請將結果存入 Result 欄位，紀念日日期存放在 date，紀念日名稱存在 name。"
+                   "請直接輸出符合 JSON 格式的結果，且無多餘的解釋文字。"),
+        *few_shot_prompt.format_prompt().to_messages(),
         ("human", "{query}")
     ])
 
-    response = llm.invoke(prompt.invoke({"query": question}))
-    return response
+# 使用 langchain 和 Few-Shot Examples 回答問題
+def generate_hw01(question):
+    # 初始化模型
+    llm = initialize_llm()
+
+    # 定義 Few-Shot Prompt 和主要 Prompt
+    few_shot_prompt = define_few_shot_prompt()
+    main_prompt = define_main_prompt(few_shot_prompt)
+
+    # 格式化使用者查詢
+    user_prompt = main_prompt.invoke({"query": question})
+
+    # 呼叫模型並取得回應
+    response = llm.invoke(user_prompt)
+    #pprint(response.content);
+    return response.content
+
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
 def getHolidayData(month):
