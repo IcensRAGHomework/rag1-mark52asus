@@ -87,45 +87,55 @@ def generate_hw01(question):
     # 初始化模型
     llm = initialize_llm()
 
+    # ✅ 定義範例數據 (使用雙大括號避免變數解析衝突)
     examples = [
         {
             "input": "2024年台灣10月紀念日有哪些?",
-            "output": escape_json({
-                "Result": [
-                    {"date": "2024-10-10", "name": "國慶日"},
-                    {"date": "2024-10-25", "name": "台灣光復節"}
-                ]
-            })
+            "output": """{{
+        "Result": [
+            {{
+                "date": "2024-10-10",
+                "name": "國慶日"
+            }},
+            {{
+                "date": "2024-10-25",
+                "name": "台灣光復節"
+            }}
+        ]
+    }}"""
         },
         {
             "input": "2024年台灣12月紀念日有哪些?",
-            "output": escape_json({
-                "Result": [
-                    {"date": "2024-12-25", "name": "聖誕節"}
-                ]
-            })
+            "output": """{{
+        "Result": [
+            {{
+                "date": "2024-12-25",
+                "name": "聖誕節"
+            }}
+        ]
+    }}"""
         }
     ]
 
-    # ✅ 定義範例模板 (使用 ChatPromptTemplate)
+    # ✅ 定義範例模板 (使用 ChatPromptTemplate 並確保正確轉義)
     example_prompt = ChatPromptTemplate.from_messages([
         ("human", "{input}"),
         ("ai", "{output}")
     ])
 
-    # ✅ 使用 FewShotChatMessagePromptTemplate 正確格式化範例
+    # ✅ 使用 FewShotChatMessagePromptTemplate
     few_shot_prompt = FewShotChatMessagePromptTemplate(
         examples=examples,
         example_prompt=example_prompt
     )
 
-    # ✅ 正確提取範例訊息 (直接從 examples 轉換為 BaseMessage 格式)
+    # ✅ 正確提取範例訊息 (直接使用雙大括號)
     messages = []
     for example in examples:
         messages.append(HumanMessage(content=example["input"]))
         messages.append(AIMessage(content=example["output"]))
 
-    # ✅ 建立最終 PromptTemplate (使用雙重大括號以防止格式錯誤)
+    # ✅ 建立最終 PromptTemplate (已處理 JSON 格式衝突)
     final_prompt = ChatPromptTemplate.from_messages(
         [("system", "你是一個能夠以 JSON 格式回應的 AI 助手，請參考以下範例並生成符合範例的輸出。")]
         + [(message.type, message.content) for message in messages]
@@ -137,8 +147,8 @@ def generate_hw01(question):
 
     response = chain.invoke({"question": question})
     result = json.loads(response.content.strip())
-    #print(json.dumps(result, indent=4, ensure_ascii=False))
-    return result
+    formatted_result = json.dumps(result, indent=4, ensure_ascii=False)
+    return formatted_result
     #return response.content
 
     
