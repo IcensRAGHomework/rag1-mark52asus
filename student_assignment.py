@@ -27,11 +27,25 @@ def initialize_llm():
 examples = [
     {
         "input": "2024年台灣10月紀念日有哪些?",
-        "output": '{\n    "Result": [\n        {\n            "date": "2024-10-10",\n            "name": "國慶日"\n        }\n    ]\n}'
+        "output": {
+            "Result": [
+                {
+                    "date":"2024-10-10",
+                    "name":"國慶日"
+                }
+            ]
+        }
     },
     {
         "input": "2024年台灣12月紀念日有哪些?",
-        "output": '{\n    "Result": [\n        {\n            "date": "2024-12-25",\n            "name": "行憲紀念日"\n        }\n    ]\n}'
+        "output": {
+            "Result": [
+                {
+                    "date":"2024-12-25",
+                    "name":"行憲紀念日"
+                }
+            ]
+        }
     }
 ]
 
@@ -50,7 +64,7 @@ few_shot_prompt = FewShotChatMessagePromptTemplate(
 
 # 定義最終的提示模板
 final_prompt = ChatPromptTemplate.from_messages([
-    ("system", "請用 JSON 格式回答台灣特定月份的紀念日，並依照範例輸出。"),
+    ("system", "請用 JSON 格式回答台灣特定月份的紀念日，並依照範例輸出，確保 JSON 格式完全符合範例格式，包括括號與縮排。"),
     few_shot_prompt,
     ("human", "{input}")
 ])
@@ -62,14 +76,19 @@ def generate_hw01(question):
     # 建立語言模型鏈
     chain = final_prompt | llm
 
-    # 呼叫模型並回傳結果
+    # 呼叫模型並解析結果
     response = chain.invoke({"input": question})
-    # 嘗試解析為 JSON 格式，確保格式正確
+    pprint(response.content)
+
+    # 嘗試解析為 JSON 格式，移除不必要的標記
     try:
+        if isinstance(response.content, str):
+            response.content = response.content.replace('```json', '').replace('```', '').strip()
         result = json.loads(response.content)
-        formatted_result = json.dumps(result, ensure_ascii=False, indent=4)
+        return result
     except json.JSONDecodeError:
-        formatted_result = "無法解析為正確的 JSON 格式"
+        print("解析錯誤的內容:", response.content)
+        return {"Result": []}
 
     return formatted_result
     
@@ -104,7 +123,7 @@ def demo(question):
     return response
 if __name__ == '__main__':
     #response = generate_hw01('2023台灣紀念日有哪些?')
-    response = generate_hw01('2024年台灣1月紀念日有哪些?')
+    response = generate_hw01('2024年台灣12月紀念日有哪些?')
     #question2 = "2024年台灣10月紀念日有哪些?"
     #question3 = "根據先前的節日清單，這個節日{\"date\": \"10-31\", \"name\": \"蔣公誕辰紀念日\"}是否有在該月份清單？"
     #response = generate_hw03(question2, question3)
