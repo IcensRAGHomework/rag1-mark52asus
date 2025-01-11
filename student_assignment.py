@@ -10,7 +10,7 @@ from uuid import uuid4
 from model_configurations import get_model_configuration
 
 from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from typing import List, Dict
@@ -84,31 +84,54 @@ def generate_hw01(question):
     # 初始化模型
     llm = initialize_llm()
 
-# 使用新版 langchain_core.prompts.PromptTemplate
-    prompt = PromptTemplate(
-        input_variables=["question"],
-        template="""
-        問題：請回答台灣特定月份的紀念日有哪些(請用JSON格式呈現)?
-        輸出格式範例：
-        {{
-            "Result": [
-                {{
-                    "date": "2024-10-10",
-                    "name": "國慶日"
-                }},
-                {{
-                    "date": "2024-10-25",
-                    "name": "台灣光復節"
-                }}
-            ]
-        }}
-        {question}
-        嚴格按照上述範例格式輸出，直接輸出 JSON，不要加上 ```json 標記。
-        """
+    # ✅ 定義範例數據 (正確處理 JSON 格式，並使用雙重大括號)
+    examples = [
+        {
+            "input": "2024年台灣10月紀念日有哪些?",
+            "output": json.dumps({
+                "Result": [
+                    {"date": "2024-10-10", "name": "國慶日"},
+                    {"date": "2024-10-25", "name": "台灣光復節"}
+                ]
+            }, ensure_ascii=False).replace("{", "{{").replace("}", "}}")  # 轉義大括號
+        },
+        {
+            "input": "2024年台灣12月紀念日有哪些?",
+            "output": json.dumps({
+                "Result": [
+                    {"date": "2024-12-25", "name": "聖誕節"}
+                ]
+            }, ensure_ascii=False).replace("{", "{{").replace("}", "}}")  # 轉義大括號
+        }
+    ]
+
+    # ✅ 正確的範例模板 (使用 ChatPromptTemplate 並處理 JSON 格式)
+    example_prompt = ChatPromptTemplate.from_messages([
+        ("human", "{input}"),
+        ("ai", "{output}")
+    ])
+
+    # ✅ 使用 FewShotChatMessagePromptTemplate 正確格式化範例
+    few_shot_prompt = FewShotChatMessagePromptTemplate(
+        examples=examples,
+        example_prompt=example_prompt
     )
 
-    # 使用 RunnableSequence (新版語法)
-    chain = prompt | llm
+    # ✅ 正確提取範例訊息 (直接從 examples 手動轉換為 BaseMessage 格式)
+    messages = []
+    for example in examples:
+        messages.append(HumanMessage(content=example["input"]))
+        messages.append(AIMessage(content=example["output"]))
+
+    # ✅ 建立最終 PromptTemplate (正確處理 JSON 格式)
+    final_prompt = ChatPromptTemplate.from_messages(
+        [("system", "你是一個能夠以 JSON 格式回應的 AI 助手，請參考以下範例並生成符合範例的輸出。")]
+        + [(message.type, message.content) for message in messages]
+        + [("human", "{question}")]
+    )
+
+    # ✅ 使用 RunnableSequence
+    chain = final_prompt | llm
 
     response = chain.invoke({"question": question})
     return response.content
@@ -247,7 +270,7 @@ def demo(question):
     
     return response
 if __name__ == '__main__':
-    response = generate_hw01('2024年台灣10月紀念日有哪些?')
+    response = generate_hw01('2025年台灣11月紀念日有哪些?')
     #response = generate_hw02('2024年台灣12月紀念日有哪些?')
     #question2 = "2024年台灣10月紀念日有哪些?"
     #question3 = "根據先前的節日清單，這個節日{\"date\": \"10-31\", \"name\": \"蔣公誕辰紀念日\"}是否有在該月份清單？"
