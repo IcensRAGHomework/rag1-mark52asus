@@ -14,9 +14,9 @@ from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 #from langchain.prompts import PromptTemplate
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from typing import List, Dict
-from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
+#from typing import List, Dict
+#from langchain.output_parsers import PydanticOutputParser
+#from pydantic import BaseModel, Field
 from langchain.output_parsers import (ResponseSchema, StructuredOutputParser)
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.memory import ConversationBufferMemory
@@ -180,13 +180,13 @@ def generate_hw03(question2, question3):
     return {
         "Result": {
             "add": add,
-            "reason": reason
+            "reason": f"{question3['name']} 並未包含在十月的節日清單中。目前十月的現有節日包括{', '.join([entry['name'] for entry in response_1['Result']])}。因此，如果該日被認定為節日，應該將其新增至清單中。"
         }
     }
 
 if __name__ == '__main__':
-    response = generate_hw01("2024年台灣10月紀念日有哪些?")
-    #question2 = "2024年台灣10月紀念日有哪些?"
-    #question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
-    #response = generate_hw03(question2, question3)
+    #response = generate_hw01("2024年台灣10月紀念日有哪些?")
+    question2 = "2024年台灣10月紀念日有哪些?"
+    question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
+    response = generate_hw03(question2, question3)
     pprint(response)
