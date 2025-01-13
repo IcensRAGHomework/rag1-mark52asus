@@ -36,66 +36,34 @@ def initialize_llm():
             azure_endpoint=gpt_config['api_base'],
             temperature=gpt_config['temperature']
     )
-# 定義 Few-Shot Examples
-def define_few_shot_examples():
-    examples = [
-        {
-            "input": "2024年台灣10月有哪些紀念日？",
-            "output": {
-                "Result": [
-                    {"date": "2024-10-10", "name": "國慶日"},
-                    {"date": "2024-10-09", "name": "重陽節"}
-                ]
-            }
-        },
-        {
-            "input": "2024年台灣2月有哪些紀念日？",
-            "output": {
-                "Result": []
-            }
-        }
-    ]
-    return examples
-
-# 定義 Few-Shot Template
-def define_few_shot_prompt():
-    examples = define_few_shot_examples()
-    example_prompt = ChatPromptTemplate.from_messages([
-        ("human", "{input}"),
-        ("ai", "{output}")
-    ])
-    return FewShotChatMessagePromptTemplate(
-        example_prompt=example_prompt,
-        examples=examples
-    )
-
-# 定義主要 Prompt
-def define_main_prompt(few_shot_prompt):
-    return ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant. "
-                   "請回答台灣特定月份的紀念日有哪些? "
-                   "請將結果存入 Result 欄位，紀念日日期存放在 date，紀念日名稱存在 name。"
-                   "請直接輸出符合 JSON 格式的結果，且無多餘的解釋文字。"),
-        *few_shot_prompt.format_prompt().to_messages(),
-        ("human", "{query}")
-    ])
 
 # 使用 langchain 和 Few-Shot Examples 回答問題
 def generate_hw01(question):
-    # 初始化模型
     llm = initialize_llm()
-
-    # 定義 Few-Shot Prompt 和主要 Prompt
-    few_shot_prompt = define_few_shot_prompt()
-    main_prompt = define_main_prompt(few_shot_prompt)
-
-    # 格式化使用者查詢
-    user_prompt = main_prompt.invoke({"query": question})
-
-    # 呼叫模型並取得回應
+    json_parser = JsonOutputParser()
+    json_format_instructions = json_parser.get_format_instructions()
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful assistant."
+                    "請回答台灣特定月份的紀念日有哪些(請用以下JSON格式呈現)?"
+                    "如果只有一項資料，不需要用list方式"
+                    """{{
+                    "Result": 
+                        {{
+                            "date": "2024-10-10",
+                            "name": "國慶日"
+                        }}
+                    }}
+                    """               
+                   "{format_intructions}"),
+        ("human", "{query}")
+    ])
+    new_prompt = prompt.partial(format_intructions=json_format_instructions)
+    user_query = question
+    user_prompt = new_prompt.invoke({"query": user_query})
     response = llm.invoke(user_prompt)
-    #pprint(response.content);
-    return response.content
+    
+    #pprint(json_parser.invoke(response)) #變成字典輸出
+    return response.content.replace("```json\n", "").replace("\n```", "")
 
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
@@ -217,7 +185,8 @@ def generate_hw03(question2, question3):
     }
 
 if __name__ == '__main__':
-    question2 = "2024年台灣10月紀念日有哪些?"
-    question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
-    response = generate_hw03(question2, question3)
+    response = generate_hw01("2024年台灣10月紀念日有哪些?")
+    #question2 = "2024年台灣10月紀念日有哪些?"
+    #question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
+    #response = generate_hw03(question2, question3)
     pprint(response)
