@@ -159,12 +159,12 @@ def generate_hw03(question2, question3):
         raise ValueError("response_1['Result'] 可能不是正確的 JSON 格式或已序列化成字串")
     
     # 比對新節日是否存在於清單中
-    if any(entry['date'] == question3['date'] and entry['name'] == question3['name'] for entry in existing_holidays):
+    if any(isinstance(entry, dict) and entry.get('date') == question3['date'] and entry.get('name') == question3['name'] for entry in existing_holidays):
         add = False
-        reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in response_1['Result']])}。"
+        reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays if isinstance(entry, dict)])}。"
     else:
         add = True
-        reason = f"{question3['name']} 並未包含在十月的節日清單中。目前的節日清單包括：{', '.join([entry['name'] for entry in response_1['Result']])}。建議將其新增至清單中。"
+        reason = f"{question3['name']} 並未包含在十月的節日清單中。目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays if isinstance(entry, dict)])}。建議將其新增至清單中。"
 
     # 使用 Azure OpenAI 生成回應並保留歷史對話
     message = HumanMessage(content=f"根據先前的節日清單，這個節日{question3}是否有在該月份清單？")
