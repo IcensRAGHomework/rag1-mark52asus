@@ -149,12 +149,11 @@ def generate_hw03(question2, question3):
             azure_endpoint=gpt_config['api_base'],
             temperature=gpt_config['temperature']
     )
-    response_1 = json.loads(generate_hw02(question2))
-    # 將前一次的清單格式化為可比較的格式
+    response_1 = generate_hw02(question2)
+
     try:
-        if isinstance(response_1, str):
-            response_1 = json.loads(response_1)
-        existing_holidays = [{"date": entry['date'], "name": entry['name']} for entry in response_1['Result']]
+        response_1 = json.loads(response_1) if isinstance(response_1, str) else response_1
+        existing_holidays = response_1.get('Result', [])
     except (TypeError, KeyError, json.JSONDecodeError):
         raise ValueError("response_1['Result'] 可能不是正確的 JSON 格式或已序列化成字串")
     
@@ -168,7 +167,8 @@ def generate_hw03(question2, question3):
 
     # 使用 Azure OpenAI 生成回應並保留歷史對話
     message = HumanMessage(content=f"根據先前的節日清單，這個節日{question3}是否有在該月份清單？")
-    response = llm.invoke([message], config={'configurable': {'session_id': str(uuid4())}})
+    runnable_llm = RunnableWithMessageHistory(llm, get_session_history)
+    response = runnable_llm.invoke([message], config={'configurable': {'session_id': str(uuid4())}})
     
     return {
         "Result": {
