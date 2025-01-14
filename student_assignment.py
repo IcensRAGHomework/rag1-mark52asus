@@ -12,15 +12,9 @@ from model_configurations import get_model_configuration
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-#from langchain.prompts import PromptTemplate
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-#from typing import List, Dict
-#from langchain.output_parsers import PydanticOutputParser
-#from pydantic import BaseModel, Field
-from langchain.output_parsers import (ResponseSchema, StructuredOutputParser)
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.memory import ConversationBufferMemory
-from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
