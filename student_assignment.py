@@ -134,6 +134,28 @@ def generate_hw02(question):
         print("無法識別月份，請輸入有效的查詢格式。")
     response = llm.invoke(user_prompt)
     return response.content.replace("```json\n", "").replace("\n```", "")
+from functools import partial
+import json
+import traceback
+import re
+import requests
+from rich import print as pprint
+from uuid import uuid4
+
+from model_configurations import get_model_configuration
+
+from langchain_openai import AzureChatOpenAI
+from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from typing import List, Dict
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from langchain.output_parsers import (ResponseSchema, StructuredOutputParser)
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+
 # 建立記憶體儲存 
 memory = ConversationBufferMemory(return_messages=True)
 
@@ -157,13 +179,17 @@ def generate_hw03(question2, question3):
     except (TypeError, KeyError, json.JSONDecodeError):
         raise ValueError("response_1['Result'] 可能不是正確的 JSON 格式或已序列化成字串")
     
+    # 確保 existing_holidays 是列表並且每個項目都是字典
+    if not isinstance(existing_holidays, list) or not all(isinstance(entry, dict) for entry in existing_holidays):
+        raise ValueError("response_1['Result'] 應為包含字典的列表")
+
     # 比對新節日是否存在於清單中
-    if any(isinstance(entry, dict) and entry.get('date') == question3['date'] and entry.get('name') == question3['name'] for entry in existing_holidays):
+    if any(entry.get('date') == question3['date'] and entry.get('name') == question3['name'] for entry in existing_holidays):
         add = False
-        reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays if isinstance(entry, dict)])}。"
+        reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays])}。"
     else:
         add = True
-        reason = f"{question3['name']} 並未包含在十月的節日清單中。目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays if isinstance(entry, dict)])}。建議將其新增至清單中。"
+        reason = f"{question3['name']} 並未包含在十月的節日清單中。目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays])}。建議將其新增至清單中。"
 
     # 使用 Azure OpenAI 生成回應並保留歷史對話
     message = HumanMessage(content=f"根據先前的節日清單，這個節日{question3}是否有在該月份清單？")
@@ -176,6 +202,13 @@ def generate_hw03(question2, question3):
             "reason": reason
         }
     }
+
+if __name__ == '__main__':
+    question2 = "2024年台灣10月紀念日有哪些?"
+    question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
+    response = generate_hw03(question2, question3)
+    pprint(response)
+
 
 if __name__ == '__main__':
     #response = generate_hw01("2024年台灣10月紀念日有哪些?")
