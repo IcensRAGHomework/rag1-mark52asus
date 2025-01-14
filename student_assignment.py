@@ -140,7 +140,6 @@ memory = ConversationBufferMemory(return_messages=True)
 def get_session_history(session_id):
     return memory.chat_memory if hasattr(memory, 'chat_memory') else []
 
-
 def generate_hw03(question2, question3):
     llm = AzureChatOpenAI(
             model=gpt_config['model_name'],
@@ -151,16 +150,16 @@ def generate_hw03(question2, question3):
             temperature=gpt_config['temperature']
     )
     response_1 = json.loads(generate_hw02(question2))
-    #print("hw02:" + str(response_1))
-    runnable_llm = RunnableWithMessageHistory(llm, get_session_history)    
     # 將前一次的清單格式化為可比較的格式
     try:
-        existing_holidays = [(entry['date'], entry['name']) for entry in response_1['Result']]
-    except (TypeError, KeyError):
+        if isinstance(response_1, str):
+            response_1 = json.loads(response_1)
+        existing_holidays = [{"date": entry['date'], "name": entry['name']} for entry in response_1['Result']]
+    except (TypeError, KeyError, json.JSONDecodeError):
         raise ValueError("response_1['Result'] 可能不是正確的 JSON 格式或已序列化成字串")
     
     # 比對新節日是否存在於清單中
-    if (question3['date'], question3['name']) in existing_holidays:
+    if any(entry['date'] == question3['date'] and entry['name'] == question3['name'] for entry in existing_holidays):
         add = False
         reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in response_1['Result']])}。"
     else:
@@ -169,12 +168,12 @@ def generate_hw03(question2, question3):
 
     # 使用 Azure OpenAI 生成回應並保留歷史對話
     message = HumanMessage(content=f"根據先前的節日清單，這個節日{question3}是否有在該月份清單？")
-    response = runnable_llm.invoke([message], config={'configurable': {'session_id': str(uuid4())}})
+    response = llm.invoke([message], config={'configurable': {'session_id': str(uuid4())}})
     
     return {
         "Result": {
             "add": add,
-            "reason": f"{question3['name']} 並未包含在十月的節日清單中。目前十月的現有節日包括{', '.join([entry['name'] for entry in response_1['Result']])}。因此，如果該日被認定為節日，應該將其新增至清單中。"
+            "reason": reason
         }
     }
 
