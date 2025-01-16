@@ -91,7 +91,7 @@ def generate_hw01(question):
     # 呼叫模型並取得回應
     response = llm.invoke(user_prompt)
     #pprint(response.content);
-    return response.content
+    return response.content.replace("'", "\"")
 
 
 
