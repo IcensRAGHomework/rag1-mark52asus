@@ -11,10 +11,11 @@ from model_configurations import get_model_configuration
 
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import ChatMessageHistory
+
 
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
@@ -31,33 +32,7 @@ def initialize_llm():
             temperature=gpt_config['temperature']
     )
 
-# 使用 langchain 和 Few-Shot Examples 回答問題
-def generate_hw01(question):
-    llm = initialize_llm()
-    json_parser = JsonOutputParser()
-    json_format_instructions = json_parser.get_format_instructions()
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant."
-                    "請回答台灣特定月份的紀念日有哪些(請用以下JSON格式呈現)?"
-                    "如果只有一項資料，不需要用list方式"
-                    """{{
-                    "Result": 
-                        {{
-                            "date": "2024-10-10",
-                            "name": "國慶日"
-                        }}
-                    }}
-                    """               
-                   "{format_intructions}"),
-        ("human", "{query}")
-    ])
-    new_prompt = prompt.partial(format_intructions=json_format_instructions)
-    user_query = question
-    user_prompt = new_prompt.invoke({"query": user_query})
-    response = llm.invoke(user_prompt)
-    
-    #pprint(json_parser.invoke(response)) #變成字典輸出
-    return response.content.replace("```json\n", "").replace("\n```", "")
+
 
     
 # 定義函數：透過 Calendarific API 取得台灣的假日資料
@@ -134,80 +109,107 @@ def generate_hw02(question):
         print("無法識別月份，請輸入有效的查詢格式。")
     response = llm.invoke(user_prompt)
     return response.content.replace("```json\n", "").replace("\n```", "")
-from functools import partial
-import json
-import traceback
-import re
-import requests
-from rich import print as pprint
-from uuid import uuid4
 
-from model_configurations import get_model_configuration
+# 初始化消息歷史記錄
+message_history = ChatMessageHistory()
 
-from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import HumanMessage
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from typing import List, Dict
-from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
-from langchain.output_parsers import (ResponseSchema, StructuredOutputParser)
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain.memory import ConversationBufferMemory
-from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+# 儲存和檢索記憶的函數
+class MemoryManager:
+    def __init__(self):
+        self.storage = {}
 
-# 建立記憶體儲存 
-memory = ConversationBufferMemory(return_messages=True)
+    def store(self, key, value):
+        self.storage[key] = value
 
-def get_session_history(session_id):
-    return memory.chat_memory if hasattr(memory, 'chat_memory') else []
+    def retrieve(self, key, default=None):
+        return self.storage.get(key, default)
+
+# 初始化記憶管理器
+memory = MemoryManager()
+
+# 創建一個消息歷史函數
+def get_session_history():
+    return memory.retrieve("message_history", [])
+
+# 節日清單作為前一次對話結果
+holiday_list = {
+    "Result": [
+        {"date": "2024-10-10", "name": "國慶日"},
+        {"date": "2024-10-09", "name": "重陽節"},
+        {"date": "2024-10-21", "name": "華僑節"},
+        {"date": "2024-10-25", "name": "台灣光復節"},
+        {"date": "2024-10-31", "name": "萬聖節"}
+    ]
+}
+
+
+# 檢查給定節日是否存在的函數
+def check_holiday_existence(stored_holiday_list, target_holiday):
+    for holiday in stored_holiday_list["Result"]:
+        if holiday["date"].endswith(target_holiday["date"]) and holiday["name"] == target_holiday["name"]:
+            return True
+    return False
 
 def generate_hw03(question2, question3):
-    llm = AzureChatOpenAI(
-            model=gpt_config['model_name'],
-            deployment_name=gpt_config['deployment_name'],
-            openai_api_key=gpt_config['api_key'],
-            openai_api_version=gpt_config['api_version'],
-            azure_endpoint=gpt_config['api_base'],
-            temperature=gpt_config['temperature']
-    )
-    response_1 = generate_hw02(question2)
+    #dialogue = f'{question2}{question3}'
+    response = generate_hw02(question2)
+    dialogue = f'{question3}'
 
-    try:
-        response_1 = json.loads(response_1) if isinstance(response_1, str) else response_1
-        existing_holidays = response_1.get('Result', [])
-    except (TypeError, KeyError, json.JSONDecodeError):
-        raise ValueError("response_1['Result'] 可能不是正確的 JSON 格式或已序列化成字串")
-    
-    # 確保 existing_holidays 是列表並且每個項目都是字典
-    if not isinstance(existing_holidays, list) or not all(isinstance(entry, dict) for entry in existing_holidays):
-        raise ValueError("response_1['Result'] 應為包含字典的列表")
+    # 將節日清單儲存到記憶中
+    #memory.store("holiday_list", holiday_list)
+    # 將 JSON 字符串轉換為 Python 字典
+    response_dict = json.loads(response)
+    memory.store("holiday_list", response_dict)
 
-    # 比對新節日是否存在於清單中
-    if any(entry.get('date') == question3['date'] and entry.get('name') == question3['name'] for entry in existing_holidays):
-        add = False
-        reason = f"{question3['name']} 已經包含在十月的節日清單中，目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays])}。"
+
+    # 使用正則表達式提取 JSON 字符串
+    match = re.search(r'\{.*\}', dialogue)
+
+    if match:
+        holiday_json_str = match.group()
+        try:
+            # 修正單引號為雙引號，確保 JSON 格式正確
+            holiday_json_str = holiday_json_str.replace("'", '"')
+            
+            # 將 JSON 字符串轉換為 Python 字典
+            target_holiday = json.loads(holiday_json_str)
+            
+            # 從記憶中取出節日清單
+            stored_holiday_list = memory.retrieve("holiday_list")
+            
+            # 檢查是否存在
+            exists = check_holiday_existence(stored_holiday_list, target_holiday)
+            
+            # 根據檢查結果生成回應
+            if not exists:
+                reason = (
+                    f"{target_holiday['name']}並未包含在十月的節日清單中。"
+                    f"目前十月的現有節日包括"
+                    f"{', '.join([holiday['name'] for holiday in stored_holiday_list['Result']])}。"
+                    f"因此，如果該日被認定為節日，應該將其新增至清單中。"
+                )
+                return {
+                    "Result": {
+                        "add": True,
+                        "reason": reason
+                    }
+                }
+            else:
+                reason = (
+                    f"{target_holiday['name']}已經存在於十月的節日清單中。"
+                    f"目前十月的現有節日包括"
+                    f"{', '.join([holiday['name'] for holiday in stored_holiday_list['Result']])}。"
+                )
+                return {
+                    "Result": {
+                        "add": False,
+                        "reason": reason
+                    }
+                }
+        except json.JSONDecodeError:
+            return "解析 JSON 時出錯，請檢查輸入格式是否正確。"
     else:
-        add = True
-        reason = f"{question3['name']} 並未包含在十月的節日清單中。目前的節日清單包括：{', '.join([entry['name'] for entry in existing_holidays])}。建議將其新增至清單中。"
-
-    # 使用 Azure OpenAI 生成回應並保留歷史對話
-    message = HumanMessage(content=f"根據先前的節日清單，這個節日{question3}是否有在該月份清單？")
-    runnable_llm = RunnableWithMessageHistory(llm, get_session_history)
-    response = runnable_llm.invoke([message], config={'configurable': {'session_id': str(uuid4())}})
-    
-    return {
-        "Result": {
-            "add": add,
-            "reason": reason
-        }
-    }
-
-if __name__ == '__main__':
-    question2 = "2024年台灣10月紀念日有哪些?"
-    question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
-    response = generate_hw03(question2, question3)
-    pprint(response)
+        return "未找到節日信息"
 
 
 if __name__ == '__main__':
