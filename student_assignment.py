@@ -249,24 +249,24 @@ def generate_hw03(question2, question3):
                     f"{', '.join([holiday['name'] for holiday in stored_holiday_list['Result']])}。"
                     f"因此，如果該日被認定為節日，應該將其新增至清單中。"
                 )
-                return {
+                return json.dumps({
                     "Result": {
                         "add": True,
                         "reason": reason
                     }
-                }
+                }, ensure_ascii=False)
             else:
                 reason = (
                     f"{target_holiday['name']}已經存在於十月的節日清單中。"
                     f"目前十月的現有節日包括"
                     f"{', '.join([holiday['name'] for holiday in stored_holiday_list['Result']])}。"
                 )
-                return {
+                return json.dumps({
                     "Result": {
                         "add": False,
                         "reason": reason
                     }
-                }
+                }, ensure_ascii=False)
         except json.JSONDecodeError:
             return "解析 JSON 時出錯，請檢查輸入格式是否正確。"
     else:
