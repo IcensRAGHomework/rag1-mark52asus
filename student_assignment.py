@@ -5,6 +5,7 @@ import re
 import requests
 from rich import print as pprint
 from uuid import uuid4
+#from PIL import Image
 
 
 from model_configurations import get_model_configuration
@@ -12,10 +13,14 @@ from model_configurations import get_model_configuration
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+from langchain.chains import LLMChain
+from langchain.schema import Document
+
 
 
 gpt_chat_version = 'gpt-4o'
@@ -272,10 +277,59 @@ def generate_hw03(question2, question3):
     else:
         return "未找到節日信息"
 
+# 定義 Prompt
+prompt = PromptTemplate(
+    input_variables=["question", "image_content"],
+    template="""
+    根據以下圖片的內容回答問題：
+    圖片內容：
+    {image_content}
+
+    問題：
+    {question}
+
+    僅提供 JSON 格式的回答，例如：
+    {{
+        "Result": {{
+            "score": 5498
+        }}
+    }}
+    """
+)
+
+# 定義 LLMChain
+def initialize_chain():
+    llm = initialize_llm()
+    return LLMChain(llm=llm, prompt=prompt)
+
+# 將圖片轉換為 base64 編碼的內容
+def convert_image_to_base64(image_path):
+    import base64
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+def generate_hw04(question):
+    # 初始化模型
+    chain = initialize_chain()
+
+    image_path = './baseball.png'
+    # 將圖片轉換為 base64 編碼的內容
+    image_content = convert_image_to_base64(image_path)
+
+    # 呼叫 Azure OpenAI API
+    # 確保正確的輸入格式
+    response = chain.run({"question": question, "image_content": image_content})
+
+
+    return response.content
+
 
 if __name__ == '__main__':
     #response = generate_hw01("2024年台灣10月紀念日有哪些?")
-    question2 = "2024年台灣10月紀念日有哪些?"
-    question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
-    response = generate_hw03(question2, question3)
+    #question2 = "2024年台灣10月紀念日有哪些?"
+    #question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
+    #response = generate_hw03(question2, question3)
+    question = "請問中華台北的積分是多少"
+    response = generate_hw04(question)
     pprint(response)
