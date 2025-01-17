@@ -5,10 +5,6 @@ import re
 import requests
 from rich import print as pprint
 from uuid import uuid4
-import pytesseract
-# 如果在 Windows 上，需要指定 Tesseract 的安装路径
-#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-from PIL import Image
 
 
 from model_configurations import get_model_configuration
@@ -281,6 +277,10 @@ def generate_hw03(question2, question3):
     else:
         return "未找到節日信息"
 
+import pytesseract
+# 如果在 Windows 上，需要指定 Tesseract 的安装路径
+#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+from PIL import Image
 
 def generate_hw04(question):
     # 初始化模型
