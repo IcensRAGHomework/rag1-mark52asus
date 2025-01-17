@@ -5,7 +5,10 @@ import re
 import requests
 from rich import print as pprint
 from uuid import uuid4
-
+#import pytesseract
+# 如果在 Windows 上，需要指定 Tesseract 的安装路径
+#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+#from PIL import Image
 
 from model_configurations import get_model_configuration
 
@@ -17,8 +20,6 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
-from langchain.chains import LLMChain
-from langchain.schema import Document
 from langchain_community.document_loaders.image import UnstructuredImageLoader
 
 
@@ -277,10 +278,6 @@ def generate_hw03(question2, question3):
     else:
         return "未找到節日信息"
 
-import pytesseract
-# 如果在 Windows 上，需要指定 Tesseract 的安装路径
-#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-from PIL import Image
 
 def generate_hw04(question):
     # 初始化模型
@@ -305,14 +302,8 @@ def generate_hw04(question):
         }}
         """
     )
-    # 使用OCR提取图片中的文本内容
-    image_path = "./baseball.png"
-    image = Image.open(image_path)
-    image_content = pytesseract.image_to_string(image, lang="chi_tra+eng")
 
-    # 填充Prompt并生成回答
-    # 填充 Prompt 并生成回答
-    filled_prompt = prompt.format(question=question, image_content=image_content)
+    filled_prompt = prompt.format(question=question)
     response = llm.invoke(filled_prompt)
     return response.content
 
