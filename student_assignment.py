@@ -5,7 +5,10 @@ import re
 import requests
 from rich import print as pprint
 from uuid import uuid4
-#from PIL import Image
+import pytesseract
+# 如果在 Windows 上，需要指定 Tesseract 的安装路径
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+from PIL import Image
 
 
 from model_configurations import get_model_configuration
@@ -20,6 +23,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 from langchain.chains import LLMChain
 from langchain.schema import Document
+from langchain_community.document_loaders.image import UnstructuredImageLoader
 
 
 
@@ -277,56 +281,45 @@ def generate_hw03(question2, question3):
     else:
         return "未找到節日信息"
 
-# 定義 Prompt
-prompt = PromptTemplate(
-    input_variables=["question", "image_content"],
-    template="""
-    根據以下圖片的內容回答問題：
-    圖片內容：
-    {image_content}
-
-    問題：
-    {question}
-
-    僅提供 JSON 格式的回答，例如：
-    {{
-        "Result": {{
-            "score": 5498
-        }}
-    }}
-    """
-)
-
-# 定義 LLMChain
-def initialize_chain():
-    llm = initialize_llm()
-    return LLMChain(llm=llm, prompt=prompt)
-
-# 將圖片轉換為 base64 編碼的內容
-def convert_image_to_base64(image_path):
-    import base64
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
-
 
 def generate_hw04(question):
     # 初始化模型
-    chain = initialize_chain()
+    llm = initialize_llm()
 
-    image_path = './baseball.png'
-    # 將圖片轉換為 base64 編碼的內容
-    image_content = convert_image_to_base64(image_path)
+    # 定義 Prompt
+    prompt = PromptTemplate(
+        input_variables=["question", "image_content"],
+        template="""
+        根據以下圖片的內容回答問題：
+        圖片內容：
+        {image_content}
 
-    # 呼叫 Azure OpenAI API
-    # 確保正確的輸入格式
-    response = chain.run({"question": question, "image_content": image_content})
+        問題：
+        {question}
 
+        僅提供 JSON 格式的回答，去除jason tag例如：
+        {{
+            "Result": {{
+                "score": 5498
+            }}
+        }}
+        """
+    )
+    # 使用OCR提取图片中的文本内容
+    image_path = "./baseball.png"
+    image = Image.open(image_path)
+    image_content = pytesseract.image_to_string(image, lang="chi_tra+eng")
 
+    # 填充Prompt并生成回答
+    # 填充 Prompt 并生成回答
+    filled_prompt = prompt.format(question=question, image_content=image_content)
+    response = llm.invoke(filled_prompt)
     return response.content
 
 
 if __name__ == '__main__':
     #response = generate_hw01("2024年台灣10月紀念日有哪些?")
+    #response = generate_hw02("2024年台灣10月紀念日有哪些?")
     #question2 = "2024年台灣10月紀念日有哪些?"
     #question3 = {"date": "10-31", "name": "蔣公誕辰紀念日"}
     #response = generate_hw03(question2, question3)
