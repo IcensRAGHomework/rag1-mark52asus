@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from model_configurations import get_model_configuration
 
-from langchain_openai import AzureChatOpenAIs
+from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.prompts import PromptTemplate
@@ -285,11 +285,10 @@ def generate_hw04(question):
 
     # 定義 Prompt
     prompt = PromptTemplate(
-        input_variables=["question", "image_content"],
+        input_variables=["question"],
         template="""
         根據以下圖片的內容回答問題：
         圖片內容：
-        {image_content}
 
         問題：
         {question}
