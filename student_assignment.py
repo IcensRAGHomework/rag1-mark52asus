@@ -12,7 +12,7 @@ from model_configurations import get_model_configuration
 
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -292,49 +292,32 @@ def convert_image_to_data_url(filename):
     data_url = f"data:image/png;base64,{base64_encoded}"
     return data_url
 
-# 初始化 Azure OpenAI
-def initialize_llm():
-    return AzureChatOpenAI(
-            model=gpt_config['model_name'],
-            deployment_name=gpt_config['deployment_name'],
-            openai_api_key=gpt_config['api_key'],
-            openai_api_version=gpt_config['api_version'],
-            azure_endpoint=gpt_config['api_base'],
-            temperature=gpt_config['temperature']
-    )
-
 # 生成回答的主要函数
 def generate_hw04(question):
     # 初始化模型
     llm = initialize_llm()
-    
-    # 将图片转换为 Data URL
-    filename = "baseball.png"
-    image_data_url = convert_image_to_data_url(filename)
+    image_path = './baseball.png'
+    detail_parameter = 'high'
 
-    # 定义 Prompt
-    prompt = PromptTemplate(
-        input_variables=["question", "image_data_url"],
-        template="""
-        根據以下圖片的內容回答問題：
-        圖片內容：{image_data_url}
-
-        問題：{question}
-
-        僅提供 JSON 格式的回答，去除 JSON tag 例如：
-        {{
-            "Result": {{
-                "score": 5498
-            }}
-        }}
-        """
+    chat_prompt_template = ChatPromptTemplate.from_messages(
+        messages=[
+            HumanMessage(content='請問中華台北的積分是多少，請用json格式回覆，欄位是Result, 鍵的名稱是score，不要有json tag'),
+            HumanMessagePromptTemplate.from_template(
+                [{'image_url': {'path': '{image_path}', 'detail': '{detail_parameter}'}}]
+            )
+        ]
     )
 
-    # 生成响应
-    response = llm.invoke(prompt.format(question=question, image_data_url=image_data_url))
-    
-    # 格式化并返回 JSON 数据
-    return json.loads(response)
+    prompt = chat_prompt_template.format(image_path=image_path, detail_parameter=detail_parameter)
+
+    #print(prompt[:150])
+    output_parser = StrOutputParser()
+
+    chain = chat_prompt_template | llm | output_parser
+
+    result = chain.invoke(input={"image_path":image_path,"detail_parameter":detail_parameter})
+    return result
+
 
 
 if __name__ == '__main__':
