@@ -5,10 +5,8 @@ import re
 import requests
 from rich import print as pprint
 from uuid import uuid4
-#import pytesseract
-# 如果在 Windows 上，需要指定 Tesseract 的安装路径
-#pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-#from PIL import Image
+import os
+import base64
 
 from model_configurations import get_model_configuration
 
@@ -28,7 +26,7 @@ gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
 
 
-# 初始化 Azure OpenAI (替換為你的設定)
+# 初始化 Azure OpenAI
 def initialize_llm():
     return AzureChatOpenAI(
             model=gpt_config['model_name'],
@@ -279,21 +277,51 @@ def generate_hw03(question2, question3):
         return "未找到節日信息"
 
 
+# 将图片转换为 Base64 编码的 Data URL
+def convert_image_to_data_url(filename):
+    current_directory = os.path.dirname(os.path.abspath(__file__))
+    image_path = os.path.join(current_directory, filename)
+    
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"文件 {filename} 不存在于目录 {current_directory}")
+    
+    with open(image_path, "rb") as image_file:
+        image_data = image_file.read()
+        base64_encoded = base64.b64encode(image_data).decode('utf-8')
+        
+    data_url = f"data:image/png;base64,{base64_encoded}"
+    return data_url
+
+# 初始化 Azure OpenAI
+def initialize_llm():
+    return AzureChatOpenAI(
+            model=gpt_config['model_name'],
+            deployment_name=gpt_config['deployment_name'],
+            openai_api_key=gpt_config['api_key'],
+            openai_api_version=gpt_config['api_version'],
+            azure_endpoint=gpt_config['api_base'],
+            temperature=gpt_config['temperature']
+    )
+
+# 生成回答的主要函数
 def generate_hw04(question):
     # 初始化模型
     llm = initialize_llm()
+    
+    # 将图片转换为 Data URL
+    filename = "baseball.png"
+    image_data_url = convert_image_to_data_url(filename)
 
-    # 定義 Prompt
+    # 定义 Prompt
     prompt = PromptTemplate(
-        input_variables=["question"],
+        input_variables=["question", "image_data_url"],
         template="""
         根據以下圖片的內容回答問題：
-        圖片內容：
+        圖片內容：{image_data_url}
 
-        問題：
-        {question}
+        問題：{question}
 
-        僅提供 JSON 格式的回答，去除jason tag例如：
+        僅提供 JSON 格式的回答，去除 JSON tag 例如：
         {{
             "Result": {{
                 "score": 5498
@@ -302,9 +330,11 @@ def generate_hw04(question):
         """
     )
 
-    filled_prompt = prompt.format(question=question)
-    response = llm.invoke(filled_prompt)
-    return response.content
+    # 生成响应
+    response = llm.invoke(prompt.format(question=question, image_data_url=image_data_url))
+    
+    # 格式化并返回 JSON 数据
+    return json.loads(response)
 
 
 if __name__ == '__main__':
